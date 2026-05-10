@@ -1,9 +1,8 @@
 import streamlit as st
 import torch
 import torch.nn as nn
-import numpy as np
 
-# 1. MODEL MİMARİSİ
+# 1. BİREBİR AYNI MODEL MİMARİSİ
 class CovidModel(nn.Module):
     def __init__(self):
         super(CovidModel, self).__init__()
@@ -19,7 +18,6 @@ class CovidModel(nn.Module):
     def forward(self, x):
         return self.katmanlar(x)
 
-# 2. MODELİ YÜKLE
 @st.cache_resource
 def load_model():
     model = CovidModel()
@@ -31,13 +29,11 @@ def load_model():
         st.error(f"Model yüklenemedi: {e}")
         return None
 
-# 3. ARAYÜZ AYARLARI
 st.set_page_config(page_title="Covid Tahmin", layout="wide")
 st.title("🦠 COVID-19 Akıllı Analiz Sistemi")
 
 model = load_model()
 
-# 4. GİRİŞ FORMU
 if model:
     with st.form("analiz_formu"):
         c1, c2, c3 = st.columns(3)
@@ -71,31 +67,32 @@ if model:
         submit = st.form_submit_button("HESAPLA VE ANALİZ ET", use_container_width=True)
 
         if submit:
-            # VERİ NORMALİZASYONU (ÖNEMLİ): 
-            # Kullanıcı 97-98-99 girdiğinde modelin yanılmaması için 
-            # bu değerleri eğitimdeki ortalamaya (2.0) yaklaştırıyoruz.
-            def normalize(val):
+            # Eğitimde uyguladığımız "Bilinmeyen (97-99) değerleri temizleme" işlemi
+            def temizle(val):
                 return 2.0 if val > 2 else float(val)
 
             veriler = [
                 float(usmer), float(medunit), float(sex), float(p_type), 
-                normalize(intubed), normalize(pneumonia), float(age)/100.0, # Yaşı ölçeklendirdik
-                normalize(pregnant), normalize(diabetes), normalize(copd), 
-                normalize(asthma), normalize(inmsupr), normalize(hiper), 
-                normalize(other), normalize(cardio), normalize(obesity), 
-                normalize(renal), normalize(tobacco), float(classif), normalize(icu)
+                temizle(intubed), temizle(pneumonia), float(age)/100.0, # Eğitimdeki gibi yaş/100
+                temizle(pregnant), temizle(diabetes), temizle(copd), 
+                temizle(asthma), temizle(inmsupr), temizle(hiper), 
+                temizle(other), temizle(cardio), temizle(obesity), 
+                temizle(renal), temizle(tobacco), float(classif), temizle(icu)
             ]
             
             input_tensor = torch.tensor([veriler], dtype=torch.float32)
             
-            with torch.no_grad():
-                cikti = model(input_tensor).item()
-            
-            # Sonuçların hep düşük çıkmasını engellemek için hassasiyeti artırdık
-            st.divider()
-            st.subheader(f"Risk Skoru: %{cikti*100:.2f}")
-            
-            if cikti > 0.05: # Eşik değerini veri setindeki dengesizliğe göre güncelledik
-                st.error("⚠️ RİSK TESPİT EDİLDİ")
-            else:
-                st.success("✅ RİSK DÜŞÜK")
+            try:
+                with torch.no_grad():
+                    cikti = model(input_tensor).item()
+                
+                st.divider()
+                # Eşik değeri %50 (Dengeli eğitim yaptığımız için model artık cesur davranacak)
+                st.subheader(f"Mortalite / Ağır Seyir Risk Skoru: %{cikti*100:.2f}")
+                
+                if cikti > 0.50: 
+                    st.error("⚠️ YÜKSEK RİSK: Veriler klinik olarak yüksek risk grubuna işaret etmektedir.")
+                else:
+                    st.success("✅ DÜŞÜK RİSK: Veriler düşük risk grubuna işaret etmektedir.")
+            except Exception as e:
+                st.error(f"Hesaplama Hatası: {e}")
