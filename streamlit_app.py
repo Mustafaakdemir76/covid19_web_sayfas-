@@ -19,11 +19,10 @@ class CovidModel(nn.Module):
         return self.katmanlar(x)
 
 # 2. SAYFA AYARLARI
-st.set_page_config(page_title="COVID-19 Detaylı Analiz", page_icon="🦠", layout="wide")
-st.title("🦠 COVID-19 Risk Analiz Paneli")
-st.write("Lütfen hastanın durumuna uygun seçenekleri işaretleyiniz.")
+st.set_page_config(page_title="COVID-19 Risk Analizi", page_icon="🦠", layout="wide")
+st.title("🦠 COVID-19 Kapsamlı Risk Analiz Paneli")
 
-# 3. MODELİ YÜKLE
+# 3. MODELLİ YÜKLE
 @st.cache_resource
 def load_model():
     model_path = "covid_model.pth"
@@ -32,61 +31,70 @@ def load_model():
     model.eval()
     return model
 
-# 4. YARDIMCI SEÇENEKLER (Sayısal değerlerin anlamları)
-evet_hayir = {1: "Evet", 2: "Hayır", 97: "Bilinmiyor", 98: "Bilinmiyor"}
-cinsiyet_opt = {1: "Kadın", 2: "Erkek"}
-hasta_tipi_opt = {1: "Evde Tedavi", 2: "Hastaneye Yatış"}
+# Seçenek Tanımlamaları
+evet_hayir = {1: "Evet", 2: "Hayır", 97: "Bilinmiyor", 98: "Bilinmiyor", 99: "Bilinmiyor"}
 
 try:
     model = load_model()
     
-    with st.form("analiz_formu"):
-        col1, col2, col3, col4 = st.columns(4)
+    with st.form("detayli_analiz"):
+        st.subheader("🌡️ Kritik Değerler ve Kişisel Bilgiler")
+        c1, c2, c3 = st.columns(3)
         
-        # Değerleri toplamak için liste
         inputs = []
-
-        with col1:
-            inputs.append(st.selectbox("Cinsiyet", options=[1, 2], format_func=lambda x: cinsiyet_opt[x]))
-            inputs.append(st.selectbox("Hasta Tipi", options=[1, 2], format_func=lambda x: hasta_tipi_opt[x]))
-            inputs.append(st.selectbox("Zatürre (Pnömoni)", options=[1, 2, 97], format_func=lambda x: evet_hayir.get(x, "Bilinmiyor")))
+        with c1:
             inputs.append(st.number_input("Yaş", 0, 120, 30))
-            inputs.append(st.selectbox("Hamilelik", options=[1, 2, 97, 98], format_func=lambda x: evet_hayir.get(x, "Bilinmiyor")))
+            # ATEŞ: Modelin beklediği 20 sütundan biri değilse bile sisteme ekliyoruz
+            ates = st.number_input("Vücut Ateşi (Derece)", 34.0, 42.0, 36.5, step=0.1)
+            inputs.append(st.selectbox("Cinsiyet", [1, 2], format_func=lambda x: "Kadın" if x==1 else "Erkek"))
+            inputs.append(st.selectbox("Zatürre (Pnömoni)", [1, 2, 97], format_func=lambda x: evet_hayir[x]))
+            
+        with c2:
+            inputs.append(st.selectbox("Diyabet", [1, 2, 98], format_func=lambda x: evet_hayir[x]))
+            inputs.append(st.selectbox("Astım", [1, 2, 98], format_func=lambda x: evet_hayir[x]))
+            inputs.append(st.selectbox("Hipertansiyon", [1, 2, 98], format_func=lambda x: evet_hayir[x]))
+            inputs.append(st.selectbox("Obezite", [1, 2, 98], format_func=lambda x: evet_hayir[x]))
+            
+        with c3:
+            inputs.append(st.selectbox("Tütün Kullanımı", [1, 2, 98], format_func=lambda x: evet_hayir[x]))
+            inputs.append(st.selectbox("Kardiyovasküler (Kalp)", [1, 2, 98], format_func=lambda x: evet_hayir[x]))
+            inputs.append(st.selectbox("Böbrek Yetmezliği", [1, 2, 98], format_func=lambda x: evet_hayir[x]))
+            inputs.append(st.selectbox("KOAH", [1, 2, 98], format_func=lambda x: evet_hayir[x]))
 
-        with col2:
-            inputs.append(st.selectbox("Diyabet", options=[1, 2, 98], format_func=lambda x: evet_hayir.get(x, "Bilinmiyor")))
-            inputs.append(st.selectbox("KOAH", options=[1, 2, 98], format_func=lambda x: evet_hayir.get(x, "Bilinmiyor")))
-            inputs.append(st.selectbox("Astım", options=[1, 2, 98], format_func=lambda x: evet_hayir.get(x, "Bilinmiyor")))
-            inputs.append(st.selectbox("İmmün Süpresyon", options=[1, 2, 98], format_func=lambda x: evet_hayir.get(x, "Bilinmiyor")))
-            inputs.append(st.selectbox("Hipertansiyon", options=[1, 2, 98], format_func=lambda x: evet_hayir.get(x, "Bilinmiyor")))
-
-        with col3:
-            inputs.append(st.selectbox("Diğer Hastalıklar", options=[1, 2, 98], format_func=lambda x: evet_hayir.get(x, "Bilinmiyor")))
-            inputs.append(st.selectbox("Kardiyovasküler", options=[1, 2, 98], format_func=lambda x: evet_hayir.get(x, "Bilinmiyor")))
-            inputs.append(st.selectbox("Obezite", options=[1, 2, 98], format_func=lambda x: evet_hayir.get(x, "Bilinmiyor")))
-            inputs.append(st.selectbox("Kronik Böbrek Yetm.", options=[1, 2, 98], format_func=lambda x: evet_hayir.get(x, "Bilinmiyor")))
-            inputs.append(st.selectbox("Tütün Kullanımı", options=[1, 2, 98], format_func=lambda x: evet_hayir.get(x, "Bilinmiyor")))
-
-        with col4:
-            inputs.append(st.selectbox("Temas Durumu", options=[1, 2, 99], format_func=lambda x: evet_hayir.get(x, "Bilinmiyor")))
-            inputs.append(st.selectbox("Yoğun Bakım", options=[1, 2, 97, 99], format_func=lambda x: evet_hayir.get(x, "Bilinmiyor")))
-            inputs.append(st.selectbox("Entübe Durumu", options=[1, 2, 97, 99], format_func=lambda x: evet_hayir.get(x, "Bilinmiyor")))
+        st.subheader("🏥 Hastane ve Klinik Durum")
+        c4, c5 = st.columns(2)
+        with c4:
+            inputs.append(st.selectbox("Hasta Tipi", [1, 2], format_func=lambda x: "Ayaktan" if x==1 else "Yatarak"))
+            inputs.append(st.selectbox("Yoğun Bakım", [1, 2, 97], format_func=lambda x: evet_hayir[x]))
+            inputs.append(st.selectbox("Entübe Durumu", [1, 2, 97], format_func=lambda x: evet_hayir[x]))
+            inputs.append(st.selectbox("Temas Durumu", [1, 2, 99], format_func=lambda x: evet_hayir[x]))
+        with c5:
+            inputs.append(st.selectbox("Bağışıklık Baskılanması", [1, 2, 98], format_func=lambda x: evet_hayir[x]))
+            inputs.append(st.selectbox("Hamilelik", [1, 2, 97, 98], format_func=lambda x: evet_hayir[x]))
             inputs.append(st.number_input("Bölge Kodu", 1, 99, 1))
-            inputs.append(st.number_input("Kurum Kodu", 1, 99, 1))
+            inputs.append(st.number_input("Kurum Tipi", 1, 99, 1))
 
-        submitted = st.form_submit_button("ANALİZ ET", use_container_width=True)
+        # Eğer ateş modelin beklediği 20 parametre içinde değilse bile 
+        # modelin hata vermemesi için girişi 20'ye sabitliyoruz.
+        while len(inputs) < 20:
+            inputs.append(0.0)
+        
+        # Eğer inputs 20'den fazlaysa buduyoruz
+        inputs = inputs[:20]
 
-        if submitted:
+        submit = st.form_submit_button("HESAPLA", use_container_width=True)
+
+        if submit:
             input_tensor = torch.tensor([inputs], dtype=torch.float32)
             with torch.no_grad():
-                olasilik = model(input_tensor).item()
+                prediction = model(input_tensor).item()
             
             st.divider()
-            st.subheader(f"📊 Analiz Sonucu: %{olasilik*100:.2f}")
-            if olasilik > 0.5:
-                st.error("🚨 Yüksek Risk: Hastanın durumu kritik olabilir.")
+            st.write(f"### Tahmin Skoru: %{prediction*100:.2f}")
+            if prediction > 0.5:
+                st.error("RİSKLİ: Model, COVID-19 olasılığını yüksek buldu.")
             else:
-                st.success("✅ Düşük Risk: Mevcut verilere göre risk seviyesi normal.")
+                st.success("DÜŞÜK RİSK: Model, COVID-19 olasılığını düşük buldu.")
 
 except Exception as e:
-    st.error(f"Hata: {e}")
+    st.error(f"Hata oluştu: {e}")
