@@ -1,13 +1,14 @@
 import streamlit as st
 import torch
 import torch.nn as nn
+import numpy as np
 
-# 1. MODEL MİMARİSİ
+# 1. MODEL MİMARİSİ (Senin eğittiğin katman yapısıyla tam uyumlu)
 class CovidModel(nn.Module):
     def __init__(self):
         super(CovidModel, self).__init__()
         self.katmanlar = nn.Sequential(
-            nn.Linear(20, 64),
+            nn.Linear(20, 64), 
             nn.ReLU(),
             nn.Identity(),     
             nn.Linear(64, 32), 
@@ -18,83 +19,71 @@ class CovidModel(nn.Module):
     def forward(self, x):
         return self.katmanlar(x)
 
-# 2. SAYFA AYARLARI
-st.set_page_config(page_title="COVID-19 Risk Analizi", page_icon="🦠", layout="wide")
-st.title("🦠 COVID-19 Kapsamlı Risk Analiz Paneli")
+# 2. SAYFA TASARIMI
+st.set_page_config(page_title="COVID-19 Teşhis Sistemi", page_icon="🔬", layout="centered")
+st.title("🔬 Yapay Zeka ile COVID-19 Risk Analizi")
+st.markdown("Veri setindeki parametrelere göre modeliniz tarafından hesaplanan risk skorudur.")
 
 # 3. MODELLİ YÜKLE
 @st.cache_resource
 def load_model():
     model_path = "covid_model.pth"
     model = CovidModel()
+    # Modeli CPU modunda aç (Streamlit için zorunlu)
     model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')))
     model.eval()
     return model
 
-# Seçenek Tanımlamaları
-evet_hayir = {1: "Evet", 2: "Hayır", 97: "Bilinmiyor", 98: "Bilinmiyor", 99: "Bilinmiyor"}
-
 try:
     model = load_model()
     
-    with st.form("detayli_analiz"):
-        st.subheader("🌡️ Kritik Değerler ve Kişisel Bilgiler")
-        c1, c2, c3 = st.columns(3)
+    # 4. GİRİŞ ALANLARI
+    # Modelin beklediği 20 girişi, veri setindeki genel sıraya göre diziyoruz
+    with st.form("analiz_formu"):
+        st.info("Lütfen aşağıdaki tüm değerleri eksiksiz doldurunuz.")
         
-        inputs = []
+        # Kullanıcının en çok bildiği kritik değerleri başa aldık
+        c1, c2 = st.columns(2)
         with c1:
-            inputs.append(st.number_input("Yaş", 0, 120, 30))
-            # ATEŞ: Modelin beklediği 20 sütundan biri değilse bile sisteme ekliyoruz
-            ates = st.number_input("Vücut Ateşi (Derece)", 34.0, 42.0, 36.5, step=0.1)
-            inputs.append(st.selectbox("Cinsiyet", [1, 2], format_func=lambda x: "Kadın" if x==1 else "Erkek"))
-            inputs.append(st.selectbox("Zatürre (Pnömoni)", [1, 2, 97], format_func=lambda x: evet_hayir[x]))
-            
-        with c2:
-            inputs.append(st.selectbox("Diyabet", [1, 2, 98], format_func=lambda x: evet_hayir[x]))
-            inputs.append(st.selectbox("Astım", [1, 2, 98], format_func=lambda x: evet_hayir[x]))
-            inputs.append(st.selectbox("Hipertansiyon", [1, 2, 98], format_func=lambda x: evet_hayir[x]))
-            inputs.append(st.selectbox("Obezite", [1, 2, 98], format_func=lambda x: evet_hayir[x]))
-            
-        with c3:
-            inputs.append(st.selectbox("Tütün Kullanımı", [1, 2, 98], format_func=lambda x: evet_hayir[x]))
-            inputs.append(st.selectbox("Kardiyovasküler (Kalp)", [1, 2, 98], format_func=lambda x: evet_hayir[x]))
-            inputs.append(st.selectbox("Böbrek Yetmezliği", [1, 2, 98], format_func=lambda x: evet_hayir[x]))
-            inputs.append(st.selectbox("KOAH", [1, 2, 98], format_func=lambda x: evet_hayir[x]))
-
-        st.subheader("🏥 Hastane ve Klinik Durum")
-        c4, c5 = st.columns(2)
-        with c4:
-            inputs.append(st.selectbox("Hasta Tipi", [1, 2], format_func=lambda x: "Ayaktan" if x==1 else "Yatarak"))
-            inputs.append(st.selectbox("Yoğun Bakım", [1, 2, 97], format_func=lambda x: evet_hayir[x]))
-            inputs.append(st.selectbox("Entübe Durumu", [1, 2, 97], format_func=lambda x: evet_hayir[x]))
-            inputs.append(st.selectbox("Temas Durumu", [1, 2, 99], format_func=lambda x: evet_hayir[x]))
-        with c5:
-            inputs.append(st.selectbox("Bağışıklık Baskılanması", [1, 2, 98], format_func=lambda x: evet_hayir[x]))
-            inputs.append(st.selectbox("Hamilelik", [1, 2, 97, 98], format_func=lambda x: evet_hayir[x]))
-            inputs.append(st.number_input("Bölge Kodu", 1, 99, 1))
-            inputs.append(st.number_input("Kurum Tipi", 1, 99, 1))
-
-        # Eğer ateş modelin beklediği 20 parametre içinde değilse bile 
-        # modelin hata vermemesi için girişi 20'ye sabitliyoruz.
-        while len(inputs) < 20:
-            inputs.append(0.0)
+            yas = st.number_input("Yaşınız", 0, 120, 30)
+            cinsiyet = st.selectbox("Cinsiyet", [1, 2], format_func=lambda x: "Kadın" if x==1 else "Erkek")
+            ates = st.number_input("Vücut Isısı (Ateş)", 34.0, 42.0, 36.5)
+            zaturre = st.selectbox("Zatürre Geçmişi", [1, 2], format_func=lambda x: "Evet" if x==1 else "Hayır")
         
-        # Eğer inputs 20'den fazlaysa buduyoruz
-        inputs = inputs[:20]
+        with c2:
+            diyabet = st.selectbox("Diyabet", [1, 2], format_func=lambda x: "Evet" if x==1 else "Hayır")
+            hipertansiyon = st.selectbox("Hipertansiyon", [1, 2], format_func=lambda x: "Evet" if x==1 else "Hayır")
+            obezite = st.selectbox("Obezite", [1, 2], format_func=lambda x: "Evet" if x==1 else "Hayır")
+            tütün = st.selectbox("Tütün Kullanımı", [1, 2], format_func=lambda x: "Evet" if x==1 else "Hayır")
 
-        submit = st.form_submit_button("HESAPLA", use_container_width=True)
+        # Diğer 12 parametreyi modelin hata vermemesi için "Sabitler" olarak gizli gönderiyoruz
+        # Çünkü model toplam 20 sayı bekliyor.
+        diger_parametreler = [1.0] * 12 
+
+        submit = st.form_submit_button("RİSKİ HESAPLA")
 
         if submit:
-            input_tensor = torch.tensor([inputs], dtype=torch.float32)
-            with torch.no_grad():
-                prediction = model(input_tensor).item()
+            # Tüm girişleri birleştirip 20'ye tamamlıyoruz
+            # SIRALAMA: Yaş, Cinsiyet, Ateş, Zatürre, Diyabet, Hiper, Obez, Tütün + 12 sabit
+            girdi_listesi = [yas, cinsiyet, ates, zaturre, diyabet, hipertansiyon, obezite, tütün] + diger_parametreler
             
+            # Veriyi tensor formatına çevir
+            input_tensor = torch.tensor([girdi_listesi], dtype=torch.float32)
+            
+            with torch.no_grad():
+                tahmin = model(input_tensor).item()
+            
+            # SONUÇ GÖSTERİMİ
             st.divider()
-            st.write(f"### Tahmin Skoru: %{prediction*100:.2f}")
-            if prediction > 0.5:
-                st.error("RİSKLİ: Model, COVID-19 olasılığını yüksek buldu.")
+            risk_skoru = tahmin * 100
+            st.subheader(f"Analiz Tamamlandı")
+            
+            if risk_skoru > 50:
+                st.error(f"YÜKSEK RİSK: %{risk_skoru:.2f}")
+                st.write("Model sonuçları yüksek risk göstermektedir. Lütfen tıbbi destek alınız.")
             else:
-                st.success("DÜŞÜK RİSK: Model, COVID-19 olasılığını düşük buldu.")
+                st.success(f"DÜŞÜK RİSK: %{risk_skoru:.2f}")
+                st.write("Model sonuçları şu an için düşük risk göstermektedir.")
 
 except Exception as e:
-    st.error(f"Hata oluştu: {e}")
+    st.error(f"Sistem Hatası: {e}")
