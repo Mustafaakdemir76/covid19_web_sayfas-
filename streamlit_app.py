@@ -1,14 +1,13 @@
 import streamlit as st
 import torch
 import torch.nn as nn
-import numpy as np
 
-# 1. MODEL MİMARİSİ (Hata almamak için tam uyumlu yapı)
+# 1. MODEL MİMARİSİ
 class CovidModel(nn.Module):
     def __init__(self):
         super(CovidModel, self).__init__()
         self.katmanlar = nn.Sequential(
-            nn.Linear(20, 64), # 20 Parametre girişi
+            nn.Linear(20, 64),
             nn.ReLU(),
             nn.Identity(),     
             nn.Linear(64, 32), 
@@ -16,72 +15,78 @@ class CovidModel(nn.Module):
             nn.Linear(32, 1),  
             nn.Sigmoid()
         )
-
     def forward(self, x):
         return self.katmanlar(x)
 
-# 2. SAYFA TASARIMI
-st.set_page_config(page_title="COVID-19 Risk Analizi", page_icon="🦠", layout="wide")
-
-st.title("🦠 COVID-19 Olasılık Analiz Sistemi")
-st.markdown("---")
-st.sidebar.header("Sistem Hakkında")
-st.sidebar.info("Bu sistem, yapay zeka modeli kullanarak girdiğiniz verilere göre COVID-19 risk analizi yapar.")
+# 2. SAYFA AYARLARI
+st.set_page_config(page_title="COVID-19 Detaylı Analiz", page_icon="🦠", layout="wide")
+st.title("🦠 COVID-19 Risk Analiz Paneli")
+st.write("Lütfen hastanın durumuna uygun seçenekleri işaretleyiniz.")
 
 # 3. MODELİ YÜKLE
 @st.cache_resource
 def load_model():
     model_path = "covid_model.pth"
     model = CovidModel()
-    # CPU üzerinde yükleme yaparak sunucu hatalarını önler
     model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')))
     model.eval()
     return model
 
-# Beklenen 20 parametrenin isim listesi
-ozellik_isimleri = [
-    "Cinsiyet (1:K, 2:E)", "Hasta Tipi", "Zatürre (Pnömoni)", "Yaş", "Hamilelik",
-    "Diyabet", "KOAH", "Astım", "İmmün Süpresyon", "Hipertansiyon",
-    "Diğer Hastalıklar", "Kardiyovasküler", "Obezite", "Kronik Böbrek Yetm.",
-    "Tütün Kullanımı", "Temas Durumu", "Yoğun Bakım", "Entübe Durumu",
-    "Bölge Kodu", "Kurum Kodu"
-]
+# 4. YARDIMCI SEÇENEKLER (Sayısal değerlerin anlamları)
+evet_hayir = {1: "Evet", 2: "Hayır", 97: "Bilinmiyor", 98: "Bilinmiyor"}
+cinsiyet_opt = {1: "Kadın", 2: "Erkek"}
+hasta_tipi_opt = {1: "Evde Tedavi", 2: "Hastaneye Yatış"}
 
 try:
     model = load_model()
     
-    st.subheader("📋 Hasta Bilgilerini Eksiksiz Giriniz")
-    
-    # 20 Giriş Alanını Düzenli Bir Şekilde Göster
-    inputs = []
-    cols = st.columns(4) # 4 sütunlu yapı
-    
-    for i in range(20):
-        with cols[i % 4]:
-            val = st.number_input(f"{ozellik_isimleri[i]}", value=0.0, step=1.0, key=f"in_{i}")
-            inputs.append(val)
+    with st.form("analiz_formu"):
+        col1, col2, col3, col4 = st.columns(4)
+        
+        # Değerleri toplamak için liste
+        inputs = []
 
-    st.markdown("---")
-    
-    if st.button("🔍 ANALİZ ET VE HESAPLA", type="primary", use_container_width=True):
-        # Veriyi modele uygun formata getir
-        input_tensor = torch.tensor([inputs], dtype=torch.float32)
-        
-        with torch.no_grad():
-            olasilik = model(input_tensor).item()
-        
-        # Sonuç Ekranı
-        st.subheader("📊 Analiz Sonucu")
-        yuzde = olasilik * 100
-        
-        col_res1, col_res2 = st.columns(2)
-        col_res1.metric("Pozitiflik Olasılığı", f"%{yuzde:.2f}")
-        
-        if olasilik > 0.5:
-            col_res2.error("🚨 YÜKSEK RİSK: Lütfen en yakın sağlık kuruluşuna başvurunuz.")
-        else:
-            col_res2.success("✅ DÜŞÜK RİSK: Şu anki verilere göre risk düşük görünmektedir.")
+        with col1:
+            inputs.append(st.selectbox("Cinsiyet", options=[1, 2], format_func=lambda x: cinsiyet_opt[x]))
+            inputs.append(st.selectbox("Hasta Tipi", options=[1, 2], format_func=lambda x: hasta_tipi_opt[x]))
+            inputs.append(st.selectbox("Zatürre (Pnömoni)", options=[1, 2, 97], format_func=lambda x: evet_hayir.get(x, "Bilinmiyor")))
+            inputs.append(st.number_input("Yaş", 0, 120, 30))
+            inputs.append(st.selectbox("Hamilelik", options=[1, 2, 97, 98], format_func=lambda x: evet_hayir.get(x, "Bilinmiyor")))
+
+        with col2:
+            inputs.append(st.selectbox("Diyabet", options=[1, 2, 98], format_func=lambda x: evet_hayir.get(x, "Bilinmiyor")))
+            inputs.append(st.selectbox("KOAH", options=[1, 2, 98], format_func=lambda x: evet_hayir.get(x, "Bilinmiyor")))
+            inputs.append(st.selectbox("Astım", options=[1, 2, 98], format_func=lambda x: evet_hayir.get(x, "Bilinmiyor")))
+            inputs.append(st.selectbox("İmmün Süpresyon", options=[1, 2, 98], format_func=lambda x: evet_hayir.get(x, "Bilinmiyor")))
+            inputs.append(st.selectbox("Hipertansiyon", options=[1, 2, 98], format_func=lambda x: evet_hayir.get(x, "Bilinmiyor")))
+
+        with col3:
+            inputs.append(st.selectbox("Diğer Hastalıklar", options=[1, 2, 98], format_func=lambda x: evet_hayir.get(x, "Bilinmiyor")))
+            inputs.append(st.selectbox("Kardiyovasküler", options=[1, 2, 98], format_func=lambda x: evet_hayir.get(x, "Bilinmiyor")))
+            inputs.append(st.selectbox("Obezite", options=[1, 2, 98], format_func=lambda x: evet_hayir.get(x, "Bilinmiyor")))
+            inputs.append(st.selectbox("Kronik Böbrek Yetm.", options=[1, 2, 98], format_func=lambda x: evet_hayir.get(x, "Bilinmiyor")))
+            inputs.append(st.selectbox("Tütün Kullanımı", options=[1, 2, 98], format_func=lambda x: evet_hayir.get(x, "Bilinmiyor")))
+
+        with col4:
+            inputs.append(st.selectbox("Temas Durumu", options=[1, 2, 99], format_func=lambda x: evet_hayir.get(x, "Bilinmiyor")))
+            inputs.append(st.selectbox("Yoğun Bakım", options=[1, 2, 97, 99], format_func=lambda x: evet_hayir.get(x, "Bilinmiyor")))
+            inputs.append(st.selectbox("Entübe Durumu", options=[1, 2, 97, 99], format_func=lambda x: evet_hayir.get(x, "Bilinmiyor")))
+            inputs.append(st.number_input("Bölge Kodu", 1, 99, 1))
+            inputs.append(st.number_input("Kurum Kodu", 1, 99, 1))
+
+        submitted = st.form_submit_button("ANALİZ ET", use_container_width=True)
+
+        if submitted:
+            input_tensor = torch.tensor([inputs], dtype=torch.float32)
+            with torch.no_grad():
+                olasilik = model(input_tensor).item()
+            
+            st.divider()
+            st.subheader(f"📊 Analiz Sonucu: %{olasilik*100:.2f}")
+            if olasilik > 0.5:
+                st.error("🚨 Yüksek Risk: Hastanın durumu kritik olabilir.")
+            else:
+                st.success("✅ Düşük Risk: Mevcut verilere göre risk seviyesi normal.")
 
 except Exception as e:
-    st.error(f"Sistem Hatası: {e}")
-    st.warning("Lütfen 'covid_model.pth' dosyasının GitHub'da olduğundan emin olun.")
+    st.error(f"Hata: {e}")
